@@ -64,11 +64,7 @@ Staggered adoption designs are supported — the estimator loops over treatment-
 
 ## Reference
 
-Asher, Sam, Chad Hazlett, and Yiqing Xu. "Trajectory Balancing: A General Reweighting Approach to Causal Inference with Time-Series Cross-Sectional Data." Available at SSRN: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3214231>.
-
-## Authors
-
-Chad Hazlett, Yiqing Xu, Samuel Asher
+Asher, Samuel G.Z., Chad Hazlett, and Yiqing Xu. "Trajectory Balancing: A General Reweighting Approach to Causal Inference with Time-Series Cross-Sectional Data." Available at SSRN: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3214231>.
 
 ## License
 
