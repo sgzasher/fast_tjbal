@@ -40,3 +40,11 @@ docs
 man/.DS_Store
 .DS_Store
 
+# Internal development files
+kmmd_optimization.md
+tjbal2025_theory.pdf
+sim_old_scripts/
+tests/
+.claude/
+CLAUDE.md
+

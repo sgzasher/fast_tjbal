@@ -1,92 +1,75 @@
-
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-# tjbal
+# fast.tjbal
 
 <!-- badges: start -->
-
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
-[![License:
-MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://www.tidyverse.org/lifecycle/#experimental)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 <!-- badges: end -->
 
-**R** package for implementing trajectory balancing, a kernel-based
-reweighting method for causal inference with panel data.
+**R** package for trajectory balancing — a kernel-based reweighting method for causal inference with time-series cross-sectional (panel) data.
 
-**Repo:** [GitHub](https://github.com/xuyiqing/tjbal)
+This is a fork of [`tjbal`](https://github.com/xuyiqing/tjbal) (Hazlett & Xu) that replaces the `kbal` dependency with a self-contained solver and adds a Nystrom approximation for scalability to large panels.
 
-**Examples:** R code used in the
-[tutorial](https://yiqingxu.org/packages/tjbal/articles/tutorial.html)
-can be downloaded from [here](tjbal_examples.R).
+## What's different from `tjbal`
 
-**Reference**: Hazlett, Chad and Yiqing Xu, 2018. “Trajectory Balancing:
-A General Reweighting Approach to Causal Inference with Time-Series
-Cross-Sectional Data.” Working Paper, UCLA and Stanford. Available at
-SSRN: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3214231>.
+The original `tjbal` delegates kernel balancing to the [`kbal`](https://github.com/csterbenz1/KBAL) package, which solves an exact balancing problem using a truncated eigendecomposition of the full N x N Gram matrix.
+
+`fast.tjbal` reformulates the balancing objective as a **kernel maximum mean discrepancy (MMD)** minimization problem with entropy regularization:
+
+```
+w* = argmin   w' K_CC w  -  2 k_TC' w  +  eta * sum(w_i log w_i)
+      s.t.    sum(w_i) = 1,  w_i >= 0
+```
+
+where `K_CC` is the kernel Gram matrix among controls and `k_TC` is the kernel mean map from treated units to controls. The entropy term ensures strict convexity (unique solution), keeps all weights positive, and provides dimension-free weight stability via Pinsker's inequality.
+
+The KKT conditions reduce to a **k-dimensional fixed-point system** `G(z) = 0`, solved by Newton's method with backtracking line search. This replaces the N-dimensional primal problem with a system whose dimension equals the rank of the kernel approximation.
+
+Two computational paths are available:
+
+- **Exact path** (`nystrom = FALSE`): eigendecompose the full Gram matrix, automatically select the rank `k` that minimizes a bias bound over the residual eigenspace.
+- **Nystrom path** (`nystrom = TRUE`, default for N > 1000): sample `m` landmark points, form a Nystrom feature matrix `Phi` such that `K ~ Phi Phi'`, and solve the same fixed-point system without ever forming the N x N kernel matrix. Cost is O(N m^2) instead of O(N^3).
 
 ## Installation
 
-<!---
-You can install **fect** directly from CRAN by typing the following command in the **R** console: 
-&#10;
 ```r
-install.packages('fect', type = 'source')
-```
---->
-
-You can install the development version of the package from Github by
-typing the following commands:
-
-``` r
-install.packages('devtools', repos = 'http://cran.us.r-project.org') # if not already installed
-# devtools::install_github('chadhazlett/kbal')
-devtools::install_github("csterbenz1/KBAL", ref = "cat_kernel")
-devtools::install_github('xuyiqing/tjbal')
+install.packages("devtools", repos = "http://cran.us.r-project.org") # if not already installed
+devtools::install_github("sgzasher/fast_tjbal")
 ```
 
-Note that installing **kbal** (from Github) is required. **tjbal** also
-depends on the following packages, which will be installed automatically
-when **tjbal** is installed. You can also install them manually:
+No external kernel-balancing package is required — all balancing is handled internally.
 
-``` r
-## for plotting
-require(ggplot2)  
-## for parallel computing 
-require(foreach)  
-require(doParallel) 
-require(parallel)
-## for data manipulation 
-require(plyr)
+## Usage
+
+The interface is the same as `tjbal`:
+
+```r
+library(fast.tjbal)
+
+out <- tjbal(Y ~ D, data = panel, index = c("unit", "time"))
+
+# Or with covariates and explicit options:
+out <- tjbal(Y ~ D + X1 + X2, data = panel, index = c("unit", "time"),
+             estimator = "kernel",  # "kernel" (default) or "mean"
+             eta = 0.001,           # entropy regularization strength
+             nystrom = NULL,        # NULL = auto (TRUE if N > 1000)
+             nystrom_m = NULL,      # number of landmarks (default: 3*sqrt(N))
+             vce = "jackknife")     # "jackknife", "bootstrap", or "fixed.weights"
+
+print(out)
+plot(out, type = "gap")
+plot(out, type = "counterfactual")
 ```
 
-**panelView** for panel data visualization is also highly recommended:
+Staggered adoption designs are supported — the estimator loops over treatment-timing subgroups and aggregates ATT estimates in event time.
 
-``` r
-devtools::install_github('xuyiqing/panelView')
-```
+## Reference
 
-### Notes on installation failures
+Asher, Sam, Chad Hazlett, and Yiqing Xu. "Trajectory Balancing: A General Reweighting Approach to Causal Inference with Time-Series Cross-Sectional Data." Available at SSRN: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3214231>.
 
-1.  Mac users who have updated to MacOS BigSur or Monterey will likely
-    encounter compilation problems. See
-    [here](http://yiqingxu.org/public/BigSurError.pdf) for a potential
-    solution.
-2.  Windows users please consider upgrading R to 4.0.0 or higher and
-    installing the [latest
-    Rtools](https://cran.r-project.org/bin/windows/Rtools/) to avoid
-    C++17 complier errors when installing fastplm.
-3.  For Rcpp, RcppArmadillo and MacOS “-lgfortran” and “-lquadmath”
-    error, click
-    [here](http://thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks-lgfortran-and-lquadmath-error/)
-    for details.
-4.  Installation failure related to OpenMP on MacOS, click
-    [here](http://thecoatlessprofessor.com/programming/openmp-in-r-on-os-x/)
-    for a solution.
-5.  To fix these issues, try installing gfortran from
-    [here](https://gcc.gnu.org/wiki/GFortranBinaries#MacOS%20clang4%20R%20Binaries%20from%20https://github.com/coatless/r-macos-clang).
+## Authors
 
-## Report bugs
+Chad Hazlett, Yiqing Xu, Samuel Asher
 
-Please report bugs to **yiqingxu \[at\] stanford.edu** with your sample
-code and data file. Much appreciated!
+## License
+
+MIT

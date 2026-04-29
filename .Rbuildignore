@@ -10,3 +10,9 @@
 ^docs$
 ^vignettes$
 ^pkgdown$
+^\.claude$
+^sim_old_scripts$
+^tjbal2025_theory\.pdf$
+^CLAUDE\.md$
+^kmmd_optimization\.md$
+^tests$
